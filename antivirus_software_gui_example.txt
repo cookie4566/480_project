@@ -1,0 +1,142 @@
+import javax.swing.*;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.DefaultHighlighter;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+
+public class SimpleAntivirusGUI extends JFrame {
+    private JTextArea resultTextArea;
+    private JTextField directoryTextField;
+
+    public SimpleAntivirusGUI() {
+        setTitle("Simple Antivirus");
+        setSize(500, 400);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+        resultTextArea = new JTextArea();
+        resultTextArea.setEditable(false);
+
+        JScrollPane scrollPane = new JScrollPane(resultTextArea);
+        getContentPane().add(scrollPane, BorderLayout.CENTER);
+
+        directoryTextField = new JTextField();
+        directoryTextField.setPreferredSize(new Dimension(200, 25)); // Set preferred size
+        JButton scanButton = new JButton("Scan Directory");
+
+        JPanel inputPanel = new JPanel();
+        inputPanel.setLayout(new FlowLayout());
+        inputPanel.add(new JLabel("Directory Path:"));
+        inputPanel.add(directoryTextField);
+        inputPanel.add(scanButton);
+
+        getContentPane().add(inputPanel, BorderLayout.SOUTH);
+
+        // Add image above the title
+        ImageIcon antivirusIcon = new ImageIcon("C:/Users/Nate/eclipse-workspace/COSC480/anti.PNG");
+        JLabel imageLabel = new JLabel(antivirusIcon, JLabel.CENTER);
+
+        JLabel titleLabel = new JLabel("The one and only Antivirus Scanner");
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 16));
+
+        // Add description above the input box and submit button
+        JLabel descriptionLabel = new JLabel("Enter the directory path and click 'Scan Directory' to check for viruses.");
+        descriptionLabel.setFont(new Font("Arial", Font.PLAIN, 12));
+
+        // Adjusted the layout to include a new panel for the image and title
+        JPanel imageTitlePanel = new JPanel();
+        imageTitlePanel.setLayout(new BoxLayout(imageTitlePanel, BoxLayout.Y_AXIS));
+        imageTitlePanel.add(imageLabel);
+        imageTitlePanel.add(titleLabel);
+
+        JPanel titlePanel = new JPanel();
+        titlePanel.setLayout(new BorderLayout());
+        titlePanel.add(imageTitlePanel, BorderLayout.NORTH);
+        titlePanel.add(descriptionLabel, BorderLayout.SOUTH);
+
+        getContentPane().add(titlePanel, BorderLayout.NORTH);
+
+        scanButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String directoryPath = directoryTextField.getText();
+                try {
+                    scanDirectory(directoryPath);
+                } catch (BadLocationException e1) {
+                    e1.printStackTrace();
+                }
+            }
+        });
+    }
+
+    public void scanDirectory(String directoryPath) throws BadLocationException {
+        resultTextArea.setText(""); // Clear previous results
+        File directory = new File(directoryPath);
+        if (!directory.isDirectory()) {
+            resultTextArea.append("Invalid directory path.");
+            return;
+        }
+
+        File[] files = directory.listFiles();
+        if (files != null) {
+            for (File file : files) {
+                if (file.isFile()) {
+                    try {
+                        if (containsVirusSignature(file)) {
+                            resultTextArea.append("Virus found in file: " + file.getAbsolutePath() + "\n");
+                            highlightLine(resultTextArea, "Virus found in file: ");
+                        } else {
+                            resultTextArea.append("File is clean: " + file.getAbsolutePath() + "\n");
+                        }
+                    } catch (IOException | NoSuchAlgorithmException ex) {
+                        ex.printStackTrace();
+                    }
+                }
+            }
+        }
+    }
+
+    private void highlightLine(JTextArea textArea, String line) throws BadLocationException {
+        int startIndex = textArea.getText().indexOf(line);
+        int endIndex = startIndex + line.length();
+        textArea.getHighlighter().addHighlight(startIndex, endIndex, new DefaultHighlighter.DefaultHighlightPainter(Color.RED));
+    }
+
+    public boolean containsVirusSignature(File file) throws IOException, NoSuchAlgorithmException {
+        String virusSignature = "9f981663bd1b057cb876c64e2fcb1255";
+        MessageDigest md = MessageDigest.getInstance("MD5");
+        byte[] buffer = new byte[8192]; // 8 KB buffer
+
+        try (var fileInputStream = Files.newInputStream(file.toPath(), StandardOpenOption.READ)) {
+            int bytesRead;
+            while ((bytesRead = fileInputStream.read(buffer)) != -1) {
+                md.update(buffer, 0, bytesRead);
+            }
+        }
+
+        byte[] fileHashBytes = md.digest();
+        StringBuilder result = new StringBuilder();
+        for (byte b : fileHashBytes) {
+            result.append(String.format("%02x", b));
+        }
+
+        // Add console logging
+        System.out.println("Calculated Hash: " + result.toString());
+        System.out.println("Expected Virus Signature: " + virusSignature);
+
+        return result.toString().equals(virusSignature);
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> {
+            SimpleAntivirusGUI antivirusGUI = new SimpleAntivirusGUI();
+            antivirusGUI.setVisible(true);
+        });
+    }
+}
