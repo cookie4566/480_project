@@ -21,7 +21,7 @@ public class SimpleAntivirusGUI extends JFrame {
 
     public SimpleAntivirusGUI() {
         setTitle("Simple Antivirus");
-        setSize(500, 400);
+        setSize(600, 400);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
         resultPanel = new JPanel();
