@@ -20,6 +20,10 @@ public class SimpleAntivirusGUI extends JFrame {
     private List<String> virusSignatures;
 
     public SimpleAntivirusGUI() {
+    	// GUI progess bar element
+    	JProgressBar progressBar;
+    	
+    	
         setTitle("Simple Antivirus");
         setSize(600, 400);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -40,11 +44,15 @@ public class SimpleAntivirusGUI extends JFrame {
         inputPanel.add(directoryTextField);
         inputPanel.add(selectDirectoryButton);
         inputPanel.add(scanButton);
+        
+        progressBar = new JProgressBar(0, task.getLengthOfTask());
+        progressBar.setValue(0);
+        progessBar.setStringPainted(true);
 
         getContentPane().add(inputPanel, BorderLayout.SOUTH);
 
         // Add image above the title
-        ImageIcon antivirusIcon = new ImageIcon("C:/Users/Nate/eclipse-workspace/COSC480/anti.PNG");
+        ImageIcon antivirusIcon = new ImageIcon("C:\Users\kenne\480_project\Untitled.jpeg");
         JLabel imageLabel = new JLabel(antivirusIcon, JLabel.CENTER);
 
         JLabel titleLabel = new JLabel("The one and only Antivirus Scanner");
@@ -79,8 +87,14 @@ public class SimpleAntivirusGUI extends JFrame {
 
         scanButton.addActionListener(new ActionListener() {
             @Override
-            public void actionPerformed(ActionEvent e) {
+            public void actionPerformed(ActionEvent e)
+            {
+            	// cursor element
+            	setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
                 String directoryPath = directoryTextField.getText();
+                task = new Task();
+                task.addPropertyChangeListener(this);
+                task.execute();
                 try {
                     scanDirectory(directoryPath);
                 } catch (BadLocationException e1) {
@@ -89,6 +103,23 @@ public class SimpleAntivirusGUI extends JFrame {
             }
         });
     }
+    // Process to stop progress bar when scan is complete
+    public void done() {
+    	done = true;
+    	Toolkit.getDefaultToolkit().beep();
+    	setCursor(null);
+    	progressBar.setValue(progressBar.getMinimum());
+    	taskOutput.append("Done\n")
+    }
+    
+    public vod propertyChange(PropertyChangeEvent evt) {
+    	if (!done) {
+    		int progress = task.getProgress();
+    		progressBar.setValue(progress);
+    		taskOutput.append(String.format("%d%% completed.\n",progress))
+    	}
+    }
+    
 
     private void selectDirectory() {
         JFileChooser fileChooser = new JFileChooser(FileSystemView.getFileSystemView().getHomeDirectory());
