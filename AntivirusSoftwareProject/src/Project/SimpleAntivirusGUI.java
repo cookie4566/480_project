@@ -11,19 +11,18 @@ import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class SimpleAntivirusGUI extends JFrame {
     private JPanel resultPanel;
     private JTextField directoryTextField;
 
     private List<String> virusSignatures;
+    private static Map<String, String> maliciousFiles = new HashMap<>();
 
     public SimpleAntivirusGUI() {
-    	// GUI progess bar element
-    	JProgressBar progressBar;
-    	
-    	
         setTitle("Simple Antivirus");
         setSize(600, 400);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -75,9 +74,6 @@ public class SimpleAntivirusGUI extends JFrame {
 
         getContentPane().add(titlePanel, BorderLayout.NORTH);
 
-        // Load virus signatures from file
-        loadVirusSignatures();
-
         selectDirectoryButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -87,39 +83,23 @@ public class SimpleAntivirusGUI extends JFrame {
 
         scanButton.addActionListener(new ActionListener() {
             @Override
-            public void actionPerformed(ActionEvent e)
-            {
-            	// cursor element
-            	setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+            public void actionPerformed(ActionEvent e) {
                 String directoryPath = directoryTextField.getText();
-                task = new Task();
-                task.addPropertyChangeListener(this);
-                task.execute();
                 try {
                     scanDirectory(directoryPath);
-                } catch (BadLocationException e1) {
-                    e1.printStackTrace();
+                } catch (IOException | NoSuchAlgorithmException | BadLocationException ex) {
+                    ex.printStackTrace();
                 }
             }
         });
+
+        // Load virus signatures from file
+        loadVirusSignatures();
+
+        // Populate the malicious files database
+        maliciousFiles.put("malicious_file.exe", "HASHVALUE1");
+        maliciousFiles.put("another_malicious_file.dll", "HASHVALUE2");
     }
-    // Process to stop progress bar when scan is complete
-    public void done() {
-    	done = true;
-    	Toolkit.getDefaultToolkit().beep();
-    	setCursor(null);
-    	progressBar.setValue(progressBar.getMinimum());
-    	taskOutput.append("Done\n")
-    }
-    
-    public vod propertyChange(PropertyChangeEvent evt) {
-    	if (!done) {
-    		int progress = task.getProgress();
-    		progressBar.setValue(progress);
-    		taskOutput.append(String.format("%d%% completed.\n",progress))
-    	}
-    }
-    
 
     private void selectDirectory() {
         JFileChooser fileChooser = new JFileChooser(FileSystemView.getFileSystemView().getHomeDirectory());
@@ -145,10 +125,7 @@ public class SimpleAntivirusGUI extends JFrame {
         }
     }
 
-
-
-
-    private void scanDirectory(String directoryPath) throws BadLocationException {
+    private void scanDirectory(String directoryPath) throws IOException, NoSuchAlgorithmException, BadLocationException {
         resultPanel.removeAll(); // Clear previous results
         resultPanel.revalidate();
         resultPanel.repaint();
@@ -164,22 +141,21 @@ public class SimpleAntivirusGUI extends JFrame {
             for (File file : files) {
                 if (file.isFile()) {
                     try {
-                        if (containsVirusSignature(file)) {
-                            JLabel virusLabel = new JLabel("<html>Virus found in file: <font color='red'>" + file.getAbsolutePath() + "</font></html>");
-                            JButton deleteButton = new JButton("Delete");
-                            deleteButton.addActionListener(new ActionListener() {
-                                @Override
-                                public void actionPerformed(ActionEvent e) {
-                                    deleteFile(file);
-                                    virusLabel.setText("<html>File deleted: <font color='red'>" + file.getAbsolutePath() + "</font></html>");
-                                }
-                            });
-
-                            resultPanel.add(virusLabel);
-                            resultPanel.add(deleteButton);
+                        boolean isMalicious = isMalicious(file);
+                        boolean containsVirusSignature = containsVirusSignature(file);
+                        JLabel resultLabel = new JLabel("File: " + file.getName());
+                        if (isMalicious) {
+                            resultLabel.setText(resultLabel.getText() + " contains SHA-256 virus.");
                         } else {
-                            resultPanel.add(new JLabel("File is clean: " + file.getAbsolutePath()));
+                            resultLabel.setText(resultLabel.getText() + " does not contain SHA-256 virus.");
                         }
+                        if (containsVirusSignature) {
+                            resultLabel.setText(resultLabel.getText() + " Contains MD5 signature.");
+                        } else {
+                            resultLabel.setText(resultLabel.getText() + " Does not contain MD5 signature.");
+                        }
+
+                        resultPanel.add(resultLabel);
                     } catch (IOException | NoSuchAlgorithmException ex) {
                         ex.printStackTrace();
                     }
@@ -189,6 +165,11 @@ public class SimpleAntivirusGUI extends JFrame {
 
         resultPanel.revalidate();
         resultPanel.repaint();
+    }
+
+    private boolean isMalicious(File file) throws NoSuchAlgorithmException, IOException {
+        String hash = calculateSHA256(file);
+        return maliciousFiles.containsValue(hash);
     }
 
     private boolean containsVirusSignature(File file) throws IOException, NoSuchAlgorithmException {
@@ -208,11 +189,7 @@ public class SimpleAntivirusGUI extends JFrame {
             result.append(String.format("%02x", b));
         }
 
-        // Add console logging
-        System.out.println("Calculated Hash: " + result.toString());
-
         for (String signature : virusSignatures) {
-            System.out.println("Expected Virus Signature: " + signature);
             if (result.toString().equals(signature)) {
                 return true;
             }
@@ -221,12 +198,20 @@ public class SimpleAntivirusGUI extends JFrame {
         return false;
     }
 
-    private void deleteFile(File file) {
-        try {
-            Files.delete(file.toPath());
-        } catch (IOException e) {
-            e.printStackTrace();
+    private String calculateSHA256(File file) throws NoSuchAlgorithmException, IOException {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        FileInputStream fis = new FileInputStream(file);
+        byte[] dataBytes = new byte[1024];
+        int bytesRead;
+        while ((bytesRead = fis.read(dataBytes)) != -1) {
+            digest.update(dataBytes, 0, bytesRead);
         }
+        byte[] hashBytes = digest.digest();
+        StringBuilder hashHex = new StringBuilder();
+        for (byte hashByte : hashBytes) {
+            hashHex.append(Integer.toString((hashByte & 0xff) + 0x100, 16).substring(1));
+        }
+        return hashHex.toString();
     }
 
     public static void main(String[] args) {
