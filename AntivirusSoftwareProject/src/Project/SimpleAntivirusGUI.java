@@ -1,4 +1,3 @@
-package Project;
 import javax.swing.*;
 import javax.swing.filechooser.FileSystemView;
 import javax.swing.text.BadLocationException;
@@ -18,7 +17,7 @@ import java.util.Map;
 import java.beans.*;
 import java.util.Random;
 
-public class SimpleAntivirusGUI extends JFrame impletments ActionListener,PropertyChangeListener{
+public class SimpleAntivirusGUI extends JFrame implements ActionListener,PropertyChangeListener{
 
     private JPanel resultPanel;
     private JTextField directoryTextField;
@@ -38,7 +37,7 @@ public class SimpleAntivirusGUI extends JFrame impletments ActionListener,Proper
     				progress += random.nextInt(10);
     				setProgress(Math.min(progress,100));
     			}
-    		} catch (InteruptedException ignore) {}
+    		} catch (InterruptedException ignore) {}
     		return null;
     	}
     	@Override
@@ -81,7 +80,7 @@ public class SimpleAntivirusGUI extends JFrame impletments ActionListener,Proper
         getContentPane().add(inputPanel, BorderLayout.SOUTH);
 
         // Add image above the title
-        ImageIcon antivirusIcon = new ImageIcon("C:\Users\kenne\480_project\Untitled.jpeg");
+        ImageIcon antivirusIcon = new ImageIcon("../Untitled.jpeg");
         JLabel imageLabel = new JLabel(antivirusIcon, JLabel.CENTER);
 
         JLabel titleLabel = new JLabel("The one and only Antivirus Scanner");
@@ -116,18 +115,19 @@ public class SimpleAntivirusGUI extends JFrame impletments ActionListener,Proper
             public void actionPerformed(ActionEvent evt) {
                 String directoryPath = directoryTextField.getText();
                 try {
-                    scanDirectory(directoryPath);
+                    File directory = new File(directoryPath);
+                    scanDirectory(directory);
                     progressMonitor = new ProgressMonitor(ProgressMonitorGui.this,"Scanning :)", 0,100);
                     progressMonitor.setProgress(0);
                     task = new Task();
-                    task.addPropertyChangeListener(this)
+                    task.addPropertyChangeListener(this);
                     task.execute();
                     scanButton.setEnabled(false);
                 } catch (IOException | NoSuchAlgorithmException | BadLocationException ex) {
                     ex.printStackTrace();
                 }
             }
-        })
+        });
         
         // method for progress bar
         public void propertyChange(PropertyChangeEvent evt) {
@@ -139,7 +139,7 @@ public class SimpleAntivirusGUI extends JFrame impletments ActionListener,Proper
         		taskOutput.append(mgs);
         		if(progressMonitor.isCanceled() || task.isDone()) {
         			Toolkit.getDefaultToolkit().beep();
-        			if(progessMonitor.isCanceled()) {
+        			if(progressMonitor.isCanceled()) {
         				task.cancel(true);
         				taskOutput.append("Scanning done.\n");
         			}else {
@@ -149,7 +149,7 @@ public class SimpleAntivirusGUI extends JFrame impletments ActionListener,Proper
         		}
         	}
         }
-        }
+        
         // Load virus signatures from file
         loadVirusSignatures();
 
@@ -189,46 +189,59 @@ public class SimpleAntivirusGUI extends JFrame impletments ActionListener,Proper
         }
     }
 
-    private void scanDirectory(String directoryPath) throws IOException, NoSuchAlgorithmException, BadLocationException {
+    private void scanDirectory(File directory) throws IOException, NoSuchAlgorithmException, BadLocationException {
         resultPanel.removeAll(); // Clear previous results
         resultPanel.revalidate();
         resultPanel.repaint();
 
-        File directory = new File(directoryPath);
-        if (!directory.isDirectory()) {
-            resultPanel.add(new JLabel("Invalid directory path."));
-            return;
+        // if user selected a single file, scan
+        if (directory.isFile()) {
+            scanFile(directory);
         }
-
-        File[] files = directory.listFiles();
-        if (files != null) {
-            for (File file : files) {
-                if (file.isFile()) {
-                    try {
-                        boolean isMalicious = isMalicious(file);
-                        boolean containsVirusSignature = containsVirusSignature(file);
-                        JLabel resultLabel = new JLabel("File: " + file.getName());
-                        if (isMalicious) {
-                            resultLabel.setText(resultLabel.getText() + " contains SHA-256 virus.");
-                        } else {
-                            resultLabel.setText(resultLabel.getText() + " does not contain SHA-256 virus.");
-                        }
-                        if (containsVirusSignature) {
-                            resultLabel.setText(resultLabel.getText() + " Contains MD5 signature.");
-                        } else {
-                            resultLabel.setText(resultLabel.getText() + " Does not contain MD5 signature.");
-                        }
-
-                        resultPanel.add(resultLabel);
-                    } catch (IOException | NoSuchAlgorithmException ex) {
-                        ex.printStackTrace();
-                    }
-                }
-            }
+        
+        // if user selected a folder
+        else {
+        	File[] files = directory.listFiles();
+        
+        	// if directory is empty, alert
+        	if (files == null) {
+                resultPanel.add(new JLabel("Empty directory " + directory.getPath()));
+        	}
+        	
+        	// scan each file
+        	else {
+	            for (File file : files) {
+	                if (file.isFile()) scanFile(file);
+	                else {
+	                	scanDirectory(file);
+	                }
+	            }
+	        }
         }
-
         resultPanel.revalidate();
         resultPanel.repaint();
+    }
+    
+    private void scanFile(File file) {
+    	try {
+    		boolean isMalicious = isMalicious(file);
+            boolean containsVirusSignature = containsVirusSignature(file);
+            JLabel resultLabel = new JLabel("File: " + file.getName());
+            if (isMalicious) {
+            	resultLabel.setText(resultLabel.getText() + " contains SHA-256 virus.");
+            } else {
+            	resultLabel.setText(resultLabel.getText() + " does not contain SHA-256 virus.");
+            }
+            if (containsVirusSignature) {
+            	resultLabel.setText(resultLabel.getText() + " Contains MD5 signature.");
+            } else {
+            	resultLabel.setText(resultLabel.getText() + " Does not contain MD5 signature.");
+            }
+
+            resultPanel.add(resultLabel);
+        } catch (IOException | NoSuchAlgorithmException ex) {
+        	ex.printStackTrace();
+        }
     }
     
     private void done() {
@@ -293,4 +306,14 @@ public class SimpleAntivirusGUI extends JFrame impletments ActionListener,Proper
             antivirusGUI.setVisible(true);
         });
     }
+	@Override
+	public void actionPerformed(ActionEvent e) {
+		// TODO Auto-generated method stub
+		
+	}
+	@Override
+	public void propertyChange(PropertyChangeEvent evt) {
+		// TODO Auto-generated method stub
+		
+	}
 }
