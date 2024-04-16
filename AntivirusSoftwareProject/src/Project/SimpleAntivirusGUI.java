@@ -1,61 +1,29 @@
+package Project;
+
 import javax.swing.*;
 import javax.swing.filechooser.FileSystemView;
 import javax.swing.text.BadLocationException;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.beans.PropertyChangeEvent;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.beans.*;
-import java.util.Random;
 
-public class SimpleAntivirusGUI extends JFrame implements ActionListener,PropertyChangeListener{
-
+public class SimpleAntivirusGUI extends JFrame {
     private JPanel resultPanel;
     private JTextField directoryTextField;
-    private ProgressMonitor progressMonitor;
-    private Task task;
-    
-    class Task extends SwingWorker<Void,Void>{
-    	@Override
-    	public Void doInBackground() {
-    		Random random = new Random();
-    		int progress = 0;
-    		setProgress(0);
-    		try {
-    			Thread.sleep(1000);
-    			while(progress < 100 && !isCancelled()) {
-    				Thread.sleep(random.nextInt(1000));
-    				progress += random.nextInt(10);
-    				setProgress(Math.min(progress,100));
-    			}
-    		} catch (InterruptedException ignore) {}
-    		return null;
-    	}
-    	@Override
-    	public void done() {
-    		Toolkit.getDefaultToolkit().beep();
-    		startButton.setEnabled(true);
-    		progressMonitor.setProgress(0);
-    	}
-    }
-    
+
     private List<String> virusSignatures;
-    private static Map<String, String> maliciousFiles = new HashMap<>();
 
     public SimpleAntivirusGUI() {
         setTitle("Simple Antivirus");
-        setSize(600, 400);
+        setSize(800, 700);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-     
 
         resultPanel = new JPanel();
         resultPanel.setLayout(new BoxLayout(resultPanel, BoxLayout.Y_AXIS));
@@ -66,8 +34,6 @@ public class SimpleAntivirusGUI extends JFrame implements ActionListener,Propert
         directoryTextField.setPreferredSize(new Dimension(200, 25)); // Set preferred size
         JButton selectDirectoryButton = new JButton("Select Directory");
         JButton scanButton = new JButton("Scan Directory");
-        
-
 
         JPanel inputPanel = new JPanel();
         inputPanel.setLayout(new FlowLayout());
@@ -75,12 +41,11 @@ public class SimpleAntivirusGUI extends JFrame implements ActionListener,Propert
         inputPanel.add(directoryTextField);
         inputPanel.add(selectDirectoryButton);
         inputPanel.add(scanButton);
-        
 
         getContentPane().add(inputPanel, BorderLayout.SOUTH);
 
         // Add image above the title
-        ImageIcon antivirusIcon = new ImageIcon("../Untitled.jpeg");
+        ImageIcon antivirusIcon = new ImageIcon("C:\\Users\\warch\\eclipse-workspace\\COSC480\\anti.jpg");
         JLabel imageLabel = new JLabel(antivirusIcon, JLabel.CENTER);
 
         JLabel titleLabel = new JLabel("The one and only Antivirus Scanner");
@@ -103,67 +68,28 @@ public class SimpleAntivirusGUI extends JFrame implements ActionListener,Propert
 
         getContentPane().add(titlePanel, BorderLayout.NORTH);
 
+        // Load virus signatures from file
+        loadVirusSignatures();
+
         selectDirectoryButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 selectDirectory();
             }
         });
-        // Added task method for scanner
+
         scanButton.addActionListener(new ActionListener() {
             @Override
-            public void actionPerformed(ActionEvent evt) {
+            public void actionPerformed(ActionEvent e) {
                 String directoryPath = directoryTextField.getText();
                 try {
-                    File directory = new File(directoryPath);
-                    scanDirectory(directory);
-                    progressMonitor = new ProgressMonitor(ProgressMonitorGui.this,"Scanning :)", 0,100);
-                    progressMonitor.setProgress(0);
-                    task = new Task();
-                    task.addPropertyChangeListener(this);
-                    task.execute();
-                    scanButton.setEnabled(false);
-                } catch (IOException | NoSuchAlgorithmException | BadLocationException ex) {
-                    ex.printStackTrace();
+                    scanDirectory(directoryPath);
+                } catch (BadLocationException e1) {
+                    e1.printStackTrace();
                 }
             }
         });
-        
-        // method for progress bar
-        public void propertyChange(PropertyChangeEvent evt) {
-        	if ("progress" == evt.getPropertyName()) {
-        		int progress = (Integer) evt.getNewValue();
-        		progressMonitor.setProgress(progress);
-        		String mgs = String.format("Progress %d%%.\n", progress);
-        		progressMonitor.setNote(mgs);
-        		taskOutput.append(mgs);
-        		if(progressMonitor.isCanceled() || task.isDone()) {
-        			Toolkit.getDefaultToolkit().beep();
-        			if(progressMonitor.isCanceled()) {
-        				task.cancel(true);
-        				taskOutput.append("Scanning done.\n");
-        			}else {
-        				taskOutput.append("Scan done.\n");
-        			}
-        			scanButton.setEnabled(true);
-        		}
-        	}
-        }
-        
-        // Load virus signatures from file
-        loadVirusSignatures();
-
-        // Populate the malicious files database
-        maliciousFiles.put("malicious_file.exe", "HASHVALUE1");
-        maliciousFiles.put("another_malicious_file.dll", "HASHVALUE2");
     }
-// Monitor gui
-	public ProgressMonitorGui() {
-		super(new Borderlayout());
-		taskOutput = new JTextArea(5,30);
-		taskOutput.setMargin(new Insets(5,5,5,5));
-		taskOutput.setEditable(false);
-	}
 
     private void selectDirectory() {
         JFileChooser fileChooser = new JFileChooser(FileSystemView.getFileSystemView().getHomeDirectory());
@@ -189,74 +115,65 @@ public class SimpleAntivirusGUI extends JFrame implements ActionListener,Propert
         }
     }
 
-    private void scanDirectory(File directory) throws IOException, NoSuchAlgorithmException, BadLocationException {
+
+
+
+    private void scanDirectory(String directoryPath) throws BadLocationException {
         resultPanel.removeAll(); // Clear previous results
         resultPanel.revalidate();
         resultPanel.repaint();
 
-        // if user selected a single file, scan
-        if (directory.isFile()) {
-            scanFile(directory);
+        File directory = new File(directoryPath);
+        if (!directory.isDirectory()) {
+            resultPanel.add(new JLabel("Invalid directory path."));
+            return;
         }
-        
-        // if user selected a folder
-        else {
-        	File[] files = directory.listFiles();
-        
-        	// if directory is empty, alert
-        	if (files == null) {
-                resultPanel.add(new JLabel("Empty directory " + directory.getPath()));
-        	}
-        	
-        	// scan each file
-        	else {
-	            for (File file : files) {
-	                if (file.isFile()) scanFile(file);
-	                else {
-	                	scanDirectory(file);
-	                }
-	            }
-	        }
+
+        File[] files = directory.listFiles();
+        if (files == null || files.length == 0) {
+            resultPanel.add(new JLabel("The directory is empty."));
+            return;
         }
+
+        scanDirectoryRecursive(directory);
+
         resultPanel.revalidate();
         resultPanel.repaint();
     }
-    
-    private void scanFile(File file) {
-    	try {
-    		boolean isMalicious = isMalicious(file);
-            boolean containsVirusSignature = containsVirusSignature(file);
-            JLabel resultLabel = new JLabel("File: " + file.getName());
-            if (isMalicious) {
-            	resultLabel.setText(resultLabel.getText() + " contains SHA-256 virus.");
-            } else {
-            	resultLabel.setText(resultLabel.getText() + " does not contain SHA-256 virus.");
-            }
-            if (containsVirusSignature) {
-            	resultLabel.setText(resultLabel.getText() + " Contains MD5 signature.");
-            } else {
-            	resultLabel.setText(resultLabel.getText() + " Does not contain MD5 signature.");
-            }
 
-            resultPanel.add(resultLabel);
-        } catch (IOException | NoSuchAlgorithmException ex) {
-        	ex.printStackTrace();
+
+    private void scanDirectoryRecursive(File directory) throws BadLocationException {
+        File[] files = directory.listFiles();
+        if (files != null) {
+            for (File file : files) {
+                if (file.isFile()) {
+                    try {
+                        if (containsVirusSignature(file)) {
+                            JLabel virusLabel = new JLabel("<html>Virus found in file: <font color='red'>" + file.getAbsolutePath() + "</font></html>");
+                            JButton deleteButton = new JButton("Delete");
+                            deleteButton.addActionListener(new ActionListener() {
+                                @Override
+                                public void actionPerformed(ActionEvent e) {
+                                    deleteFile(file);
+                                    virusLabel.setText("<html>File deleted: <font color='red'>" + file.getAbsolutePath() + "</font></html>");
+                                }
+                            });
+
+                            resultPanel.add(virusLabel);
+                            resultPanel.add(deleteButton);
+                        } else {
+                            resultPanel.add(new JLabel("File is clean: " + file.getAbsolutePath()));
+                        }
+                    } catch (IOException | NoSuchAlgorithmException ex) {
+                        ex.printStackTrace();
+                    }
+                } else if (file.isDirectory()) {
+                    scanDirectoryRecursive(file); // Recursive call for subdirectory
+                }
+            }
         }
     }
-    
-    private void done() {
-    	done = true;
-    	Toolkit.getDefaultToolkit().beep();
-    	startButton.setEnabled(true);
-    	setCursor(null):
-    	progressBar.setValue(progressBar.getMinimum());
-    	taskOutput.append("Done!!\n")
-    }
 
-    private boolean isMalicious(File file) throws NoSuchAlgorithmException, IOException {
-        String hash = calculateSHA256(file);
-        return maliciousFiles.containsValue(hash);
-    }
 
     private boolean containsVirusSignature(File file) throws IOException, NoSuchAlgorithmException {
         MessageDigest md = MessageDigest.getInstance("MD5");
@@ -275,7 +192,11 @@ public class SimpleAntivirusGUI extends JFrame implements ActionListener,Propert
             result.append(String.format("%02x", b));
         }
 
+        // Add console logging
+        System.out.println("Calculated Hash: " + result.toString());
+
         for (String signature : virusSignatures) {
+            System.out.println("Expected Virus Signature: " + signature);
             if (result.toString().equals(signature)) {
                 return true;
             }
@@ -284,20 +205,12 @@ public class SimpleAntivirusGUI extends JFrame implements ActionListener,Propert
         return false;
     }
 
-    private String calculateSHA256(File file) throws NoSuchAlgorithmException, IOException {
-        MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        FileInputStream fis = new FileInputStream(file);
-        byte[] dataBytes = new byte[1024];
-        int bytesRead;
-        while ((bytesRead = fis.read(dataBytes)) != -1) {
-            digest.update(dataBytes, 0, bytesRead);
+    private void deleteFile(File file) {
+        try {
+            Files.delete(file.toPath());
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-        byte[] hashBytes = digest.digest();
-        StringBuilder hashHex = new StringBuilder();
-        for (byte hashByte : hashBytes) {
-            hashHex.append(Integer.toString((hashByte & 0xff) + 0x100, 16).substring(1));
-        }
-        return hashHex.toString();
     }
 
     public static void main(String[] args) {
@@ -306,14 +219,4 @@ public class SimpleAntivirusGUI extends JFrame implements ActionListener,Propert
             antivirusGUI.setVisible(true);
         });
     }
-	@Override
-	public void actionPerformed(ActionEvent e) {
-		// TODO Auto-generated method stub
-		
-	}
-	@Override
-	public void propertyChange(PropertyChangeEvent evt) {
-		// TODO Auto-generated method stub
-		
-	}
 }
